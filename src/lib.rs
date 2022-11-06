@@ -1,15 +1,15 @@
-//! app-world provides a framework agnostic approach to managing frontend application state.
+//! app-universe provides a framework agnostic approach to managing frontend application state.
 //!
 //! # The Data Model
 //!
-//! An `AppWorld` is a type that you define that holds your application state as well as other
+//! An `AppUniverse` is a type that you define that holds your application state as well as other
 //! resources that you've deemed useful to have around during your application's runtime.
 //!
-//! Here's an example of what an AppWorld for a basic e-commerce app frontend might look like:
+//! Here's an example of what an AppUniverse for a basic e-commerce app frontend might look like:
 //!
 //! ```rust
 //! # use std::collections::HashMap;
-//! struct MyAppWorld {
+//! struct MyAppUniverse {
 //!     state: MyAppState,
 //!     resources: MyAppResources
 //! }
@@ -31,41 +31,41 @@
 //! # type Uuid = ();
 //! ```
 //!
-//! The `MyAppWorld` struct would be defined in your crate, but it wouldn't be used directly when
+//! The `MyAppUniverse` struct would be defined in your crate, but it wouldn't be used directly when
 //! you were passing data around to your views.
 //!
-//! Instead, you wrap it in an `app_world::AppWorldWrapper<W>`
+//! Instead, you wrap it in an `app_universe::AppUniverseWrapper<W>`
 //!
 //! ```rust
-//! type MyAppWorldWrapper = app_world::AppWorldWrapper<MyAppWorld>;
+//! type MyAppUniverseWrapper = app_universe::AppUniverseWrapper<MyAppUniverse>;
 //!
-//! # type MyAppWorld = ();
+//! # type MyAppUniverse = ();
 //! ```
 //!
-//! # AppWorldWrapper<W: AppWorld>
+//! # AppUniverseWrapper<W: AppUniverse>
 //!
-//! The `AppWorldWrapper` prevents direct mutable access to your application state, so you cannot
+//! The `AppUniverseWrapper` prevents direct mutable access to your application state, so you cannot
 //! mutate fields wherever you please.
 //!
-//! Instead, the [`AppWorld`] trait defines a [`AppWorld.msg()`] method that can be used to update
+//! Instead, the [`AppUniverse`] trait defines a [`AppUniverse.msg()`] method that can be used to update
 //! your application state.
 //!
-//! You can pass your `AppWorldWrapper<W>` to different threads by calling
-//! [`AppWorldWrapper.clone()`]. Under the hood an [`Arc`] is used to share your data across
+//! You can pass your `AppUniverseWrapper<W>` to different threads by calling
+//! [`AppUniverseWrapper.clone()`]. Under the hood an [`Arc`] is used to share your data across
 //! threads.
 //!
 //! # Example Usage
 //!
 //! TODO
 //!
-//! # When to Use app-world
+//! # When to Use app-universe
 //!
-//! app-world shines in applications that do not have extreme real time rendering requirements,
+//! app-universe shines in applications that do not have extreme real time rendering requirements,
 //! such as almost all browser, desktop and mobile applications.
 //! In games and real-time simulations, you're better off using something like an entity component
 //! system to manage your application state.
 //!
-//! This is because app-world is designed such that your application state can only be written to
+//! This is because app-universe is designed such that your application state can only be written to
 //! from one thread at a time. This is totally fine for almost all browser, desktop and mobile
 //! applications, but could be an issue for games and simulations.
 //!
@@ -82,15 +82,15 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 ///
 /// # Cloning
 ///
-/// Cloning an `AppWorldWrapper` is a very cheap operation.
+/// Cloning an `AppUniverseWrapper` is a very cheap operation.
 ///
 /// All clones hold pointers to the same inner state.
-pub struct AppWorldWrapper<W: AppWorld> {
-    world: Arc<RwLock<W>>,
+pub struct AppUniverseWrapper<W: AppUniverse> {
+    universe: Arc<RwLock<W>>,
 }
 
-/// Defines how messages that indicate that something has happened get sent to the World.
-pub trait AppWorld: Sized {
+/// Defines how messages that indicate that something has happened get sent to the universe.
+pub trait AppUniverse: Sized {
     /// Indicates that something has happened.
     ///
     /// ```
@@ -108,40 +108,45 @@ pub trait AppWorld: Sized {
     fn msg(&mut self, message: Self::Message);
 }
 
-impl<W: AppWorld + 'static> AppWorldWrapper<W> {
-    /// Create a new AppWorldWrapper.
-    pub fn new(world: W) -> Self {
-        let world = Arc::new(RwLock::new(world));
-        Self { world }
+impl<U: AppUniverse + 'static> AppUniverseWrapper<U> {
+    /// Create a new AppUniverseWrapper.
+    pub fn new(universe: U) -> Self {
+        let universe = Arc::new(RwLock::new(universe));
+        Self { universe }
     }
 
-    /// Acquire write access to the AppWorld then send a message.
-    pub fn msg(&self, msg: W::Message) {
-        self.world.write().unwrap().msg(msg)
+    /// Acquire write access to the AppUniverse then send a message.
+    pub fn msg(&self, msg: U::Message) {
+        self.universe.write().unwrap().msg(msg)
     }
 
-    /// Acquire read access to AppWorld.
-    pub fn read(&self) -> RwLockReadGuard<'_, W> {
-        self.world.read().unwrap()
+    /// Acquire read access to AppUniverse.
+    pub fn read(&self) -> RwLockReadGuard<'_, U> {
+        self.universe.read().unwrap()
     }
 
-    /// Acquire write access to AppWorld.
+    /// Subscribe to the Universe
+    pub fn subscribe(&self) {
+        // Here I want to add subscription logic
+    }
+
+    /// Acquire write access to AppUniverse.
     ///
-    /// Under normal circumstances you should only ever write to the world through the `.msg()`
+    /// Under normal circumstances you should only ever write to the universe through the `.msg()`
     /// method.
     ///
     /// This .write() method is useful when writing tests where you want to quickly set up some
     /// initial state.
     #[cfg(feature = "test-utils")]
     pub fn write(&self) -> std::sync::RwLockWriteGuard<'_, W> {
-        self.world.write().unwrap()
+        self.universe.write().unwrap()
     }
 }
 
-impl<W: AppWorld> Clone for AppWorldWrapper<W> {
+impl<W: AppUniverse> Clone for AppUniverseWrapper<W> {
     fn clone(&self) -> Self {
-        AppWorldWrapper {
-            world: self.world.clone(),
+        AppUniverseWrapper {
+            universe: self.universe.clone(),
         }
     }
 }
