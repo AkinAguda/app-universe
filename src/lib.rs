@@ -77,6 +77,10 @@
 
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
+/// A subscriber function
+/// TODO - Add Better doc
+// pub type SubscriberFn = Fn(&S);
+
 /// Holds application state and resources.
 /// See the [crate level documentation](crate) for more details.
 ///
@@ -87,6 +91,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 /// All clones hold pointers to the same inner state.
 pub struct AppUniverse<U: AppUniverseCore> {
     universe: Arc<RwLock<U>>,
+    subscribers: Vec<Box<dyn Fn(&U)>>,
 }
 
 /// This alloows you to create an app universe
@@ -118,12 +123,18 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     /// Create a new AppUniverseWrapper.
     fn new(universe_core: U) -> Self {
         let universe = Arc::new(RwLock::new(universe_core));
-        Self { universe }
+        Self {
+            universe,
+            subscribers: vec![],
+        }
     }
 
     /// Acquire write access to the AppUniverse then send a message.
     pub fn msg(&self, msg: U::Message) {
-        self.universe.write().unwrap().msg(msg)
+        self.universe.write().unwrap().msg(msg);
+        for subscriber in &self.subscribers {
+            subscriber(&self.read());
+        }
     }
 
     /// Acquire read access to AppUniverse.
@@ -132,8 +143,8 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     }
 
     /// Subscribe to the Universe
-    pub fn subscribe(&self) {
-        // Here I want to add subscription logic
+    pub fn subscribe(&mut self, subscriber_fn: Box<dyn Fn(&U)>) {
+        self.subscribers.push(subscriber_fn);
     }
 
     /// Acquire write access to AppUniverse.
@@ -153,6 +164,7 @@ impl<W: AppUniverseCore> Clone for AppUniverse<W> {
     fn clone(&self) -> Self {
         AppUniverse {
             universe: self.universe.clone(),
+            subscribers: vec![],
         }
     }
 }
@@ -193,8 +205,12 @@ mod tests {
 
     #[test]
     fn subscription_works() {
-        let mut some_value_to_update = 100;
+        let mut some_value_to_update = String::new();
         let state = TestAppState { counter: 0 };
         let universe = create_universe(state);
+        // universe.subscribe(|state| {
+        //     let v = state.counter;
+        //     some_value_to_update = format!("value is {}", v);
+        // })
     }
 }
