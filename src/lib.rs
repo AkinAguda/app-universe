@@ -75,6 +75,8 @@
 
 #![deny(missing_docs)]
 
+use std::cell::RefCell;
+
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 /// A subscriber function
@@ -171,6 +173,8 @@ impl<W: AppUniverseCore> Clone for AppUniverse<W> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use super::*;
 
     struct TestAppState {
@@ -205,12 +209,18 @@ mod tests {
 
     #[test]
     fn subscription_works() {
-        let mut some_value_to_update = String::new();
+        let a = Rc::new(RefCell::new(100));
+        let a_clone = a.clone();
         let state = TestAppState { counter: 0 };
-        let universe = create_universe(state);
-        // universe.subscribe(|state| {
-        //     let v = state.counter;
-        //     some_value_to_update = format!("value is {}", v);
-        // })
+        let mut universe = create_universe(state);
+
+        universe.subscribe(Box::new(move |state| {
+            let c = state.counter;
+            *a_clone.borrow_mut() += c;
+        }));
+
+        universe.msg(Msg::Increment(1));
+
+        assert_eq!(*a.borrow(), 101);
     }
 }
