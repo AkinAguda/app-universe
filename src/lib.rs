@@ -1,77 +1,66 @@
 //! app-universe provides a framework agnostic approach to managing frontend application state.
 //!
-//! # The Data Model
+//! # The API
 //!
-//! An `AppUniverse` is a type that you define that holds your application state as well as other
-//! resources that you've deemed useful to have around during your application's runtime.
+//! ## AppUniverseCore
 //!
-//! Here's an example of what an AppUniverse for a basic e-commerce app frontend might look like:
+//! An `AppUniverseCore` is a trait that you iplement on a struct that holds your application state.
+//!
+//! Here's an example of what an `AppUniverseCore` for a basic e-commerce app frontend might look like:
 //!
 //! ```rust
-//! # use std::collections::HashMap;
-//! struct MyAppUniverse {
-//!     state: MyAppState,
-//!     resources: MyAppResources
-//! }
-//!
-//! struct MyAppState {
+//! struct MyAppUniverseCore {
 //!     user: User,
-//!     products: HashMap<Uuid, Product>
+//!     cart: Vec<Product>
 //! }
 //!
-//! struct MyAppResources {
-//!     file_store: Box<dyn MyFileStoreTrait>,
-//!     api_client: ApiClient
+//! impl AppUniverseCore for MyAppUniverseCore {
+//!     // We Will fill this in soon
 //! }
-//!
-//! # trait MyFileStoreTrait {};
-//! # type ApiClient = ();
-//! # type Product = ();
-//! # type User = ();
-//! # type Uuid = ();
 //! ```
 //!
-//! The `MyAppUniverse` struct would be defined in your crate, but it wouldn't be used directly when
-//! you were passing data around to your views.
+//! Whenever a struct implements `AppUniverseCore`, it expects you to define 2 things:
 //!
-//! Instead, you wrap it in an `app_universe::AppUniverseWrapper<W>`
+//! - A `Message` type
+//! - A `msg` function
+//!
+//! ## The `Message` type
+//! The Message type refers to an enum were each variant will be matched against in the `msg` function and in some way, will mutate state.
+//! This Message acts like a `action` in `redux`
+//!
+//! ## The `msg` function matches against every variant in the `Message` enum and in each match branch, would in most cases mutate state in some way.
+//! This is the ONLY way to mutate state
+//!
+//! Now let's continue with our implementation
 //!
 //! ```rust
-//! type MyAppUniverseWrapper = app_universe::AppUniverseWrapper<MyAppUniverse>;
 //!
-//! # type MyAppUniverse = ();
+//! pub enum Msg {
+//!     AddProductToCart(Product),
+//! }
+//!
+//! impl AppUniverseCore for MyAppUniverseCore {
+//!     type Message = Msg;
+//!
+//!     fn msg(&mut self, message: Self::Message) {
+//!         match message {
+//!             Msg::AddProductToCart(product) => {
+//!                 self.cart.push(product);
+//!             }
+//!         }
+//!     }
+//! }
 //! ```
+//! ## The `AppUniverse`
+//! The `AppUniverse` is what you will interract with most of the time.
+//! The main way to create an app universe using the `create_universe` function.
 //!
-//! # AppUniverseWrapper<W: AppUniverse>
+//! ```rust
+//! let core = MyAppUniverseCore { user: User {}, cart: vec![] };
 //!
-//! The `AppUniverseWrapper` prevents direct mutable access to your application state, so you cannot
-//! mutate fields wherever you please.
+//! let mut universe = create_universe(core);
 //!
-//! Instead, the [`AppUniverse`] trait defines a [`AppUniverse.msg()`] method that can be used to update
-//! your application state.
-//!
-//! You can pass your `AppUniverseWrapper<W>` to different threads by calling
-//! [`AppUniverseWrapper.clone()`]. Under the hood an [`Arc`] is used to share your data across
-//! threads.
-//!
-//! # Example Usage
-//!
-//! TODO
-//!
-//! # When to Use app-universe
-//!
-//! app-universe shines in applications that do not have extreme real time rendering requirements,
-//! such as almost all browser, desktop and mobile applications.
-//! In games and real-time simulations, you're better off using something like an entity component
-//! system to manage your application state.
-//!
-//! This is because app-universe is designed such that your application state can only be written to
-//! from one thread at a time. This is totally fine for almost all browser, desktop and mobile
-//! applications, but could be an issue for games and simulations.
-//!
-//! If you're writing a game or simulation you're likely better off reaching for an
-//! entity-component-system library. Otherwise, you should be in good hands here.
-//! which could be an issue for a high-performing game or simulation.
+//! ```
 
 #![deny(missing_docs)]
 
@@ -79,16 +68,7 @@ use std::cell::RefCell;
 
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-/// A subscriber function
-/// TODO - Add Better doc
-// pub type SubscriberFn = Fn(&S);
-
-/// Holds application state and resources.
-/// See the [crate level documentation](crate) for more details.
-///
-/// # Cloning
-///
-/// Cloning an `AppUniverseWrapper` is a very cheap operation.
+/// Cloning an `AppUniverse` is a very cheap operation.
 ///
 /// All clones hold pointers to the same inner state.
 pub struct AppUniverse<U: AppUniverseCore> {
@@ -105,15 +85,6 @@ pub fn create_universe<U: AppUniverseCore + 'static>(universe_core: U) -> AppUni
 /// Defines how messages that indicate that something has happened get sent to the universe.
 pub trait AppUniverseCore: Sized {
     /// Indicates that something has happened.
-    ///
-    /// ```
-    /// # use std::time::SystemTime;
-    /// #[allow(unused)]
-    /// enum MyMessageType {
-    ///     IncreaseClickCounter,
-    ///     SetLastPausedAt(SystemTime)
-    /// }
-    /// ```
     type Message;
 
     /// Send a message to the state object.
