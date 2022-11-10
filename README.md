@@ -1,4 +1,4 @@
-[# app-universe](https://github.com/AkinAguda/app-universe)
+# [App-Universe](https://github.com/AkinAguda/app-universe)
 
 > A framework agnostic approach to managing frontend application state based on [app-world](https://github.com/chinedufn/app-world).
 
