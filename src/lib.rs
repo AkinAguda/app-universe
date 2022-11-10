@@ -64,8 +64,6 @@
 
 #![deny(missing_docs)]
 
-use std::cell::RefCell;
-
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 /// Cloning an `AppUniverse` is a very cheap operation.
@@ -180,18 +178,20 @@ mod tests {
 
     #[test]
     fn subscription_works() {
-        let a = Rc::new(RefCell::new(100));
-        let a_clone = a.clone();
+        use std::cell::RefCell;
+
+        let some_value = Rc::new(RefCell::new(100));
+        let some_value_clone = some_value.clone();
         let state = TestAppState { counter: 0 };
         let mut universe = create_universe(state);
 
         universe.subscribe(Box::new(move |state| {
             let c = state.counter;
-            *a_clone.borrow_mut() += c;
+            *some_value_clone.borrow_mut() += c;
         }));
 
         universe.msg(Msg::Increment(1));
 
-        assert_eq!(*a.borrow(), 101);
+        assert_eq!(*some_value.borrow(), 101);
     }
 }
