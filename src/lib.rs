@@ -71,7 +71,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 /// All clones hold pointers to the same inner state.
 pub struct AppUniverse<U: AppUniverseCore> {
     universe: Arc<RwLock<U>>,
-    subscribers: Vec<Box<dyn Fn()>>,
+    subscribers: Vec<Box<dyn Fn(Arc<RwLock<U>>)>>,
 }
 
 /// This alloows you to create an app universe
@@ -104,7 +104,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     pub fn msg(&self, msg: U::Message) {
         self.universe.write().unwrap().msg(msg);
         for subscriber in &self.subscribers {
-            subscriber();
+            subscriber(self.universe.clone());
         }
     }
 
@@ -114,7 +114,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     }
 
     /// Subscribe to the Universe
-    pub fn subscribe(&mut self, subscriber_fn: Box<dyn Fn()>) {
+    pub fn subscribe(&mut self, subscriber_fn: Box<dyn Fn(Arc<RwLock<U>>)>) {
         self.subscribers.push(subscriber_fn);
     }
 
@@ -184,9 +184,8 @@ mod tests {
         let some_value_clone = some_value.clone();
         let state = TestAppState { counter: 0 };
         let mut universe = create_universe(state);
-        let universe_clone = universe.clone();
-        universe.subscribe(Box::new(move || {
-            let c = universe_clone.read().counter;
+        universe.subscribe(Box::new(move |universe| {
+            let c = universe.read().unwrap().counter;
             *some_value_clone.borrow_mut() += c;
         }));
 
