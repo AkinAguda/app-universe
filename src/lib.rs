@@ -71,7 +71,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 /// All clones hold pointers to the same inner state.
 pub struct AppUniverse<U: AppUniverseCore> {
     universe: Arc<RwLock<U>>,
-    subscribers: Vec<Box<dyn Fn(Arc<RwLock<U>>)>>,
+    subscribers: Arc<RwLock<Vec<Box<dyn Fn(UniverseWrapper<U>)>>>>,
 }
 
 /// This alloows you to create an app universe
@@ -90,21 +90,24 @@ pub trait AppUniverseCore: Sized {
     fn msg(&mut self, message: Self::Message);
 }
 
+/// This wrapper defines the type of a universe
+pub type UniverseWrapper<U> = Arc<RwLock<U>>;
+
 impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     /// Create a new AppUniverseWrapper.
     fn new(universe_core: U) -> Self {
         let universe = Arc::new(RwLock::new(universe_core));
         Self {
             universe,
-            subscribers: vec![],
+            subscribers: Arc::new(RwLock::new(vec![])),
         }
     }
 
     /// Acquire write access to the AppUniverse then send a message.
     pub fn msg(&self, msg: U::Message) {
         self.universe.write().unwrap().msg(msg);
-        for subscriber in &self.subscribers {
-            subscriber(self.universe.clone());
+        for subscriber in self.subscribers.read().unwrap().iter() {
+            (subscriber)(self.universe.clone());
         }
     }
 
@@ -114,8 +117,8 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     }
 
     /// Subscribe to the Universe
-    pub fn subscribe(&mut self, subscriber_fn: Box<dyn Fn(Arc<RwLock<U>>)>) {
-        self.subscribers.push(subscriber_fn);
+    pub fn subscribe(&mut self, subscriber_fn: Box<dyn Fn(UniverseWrapper<U>)>) {
+        self.subscribers.write().unwrap().push(subscriber_fn);
     }
 
     /// Acquire write access to AppUniverse.
@@ -135,7 +138,7 @@ impl<W: AppUniverseCore> Clone for AppUniverse<W> {
     fn clone(&self) -> Self {
         AppUniverse {
             universe: self.universe.clone(),
-            subscribers: vec![],
+            subscribers: self.subscribers.clone(),
         }
     }
 }
@@ -183,7 +186,9 @@ mod tests {
         let some_value = Rc::new(RefCell::new(100));
         let some_value_clone = some_value.clone();
         let state = TestAppState { counter: 0 };
+
         let mut universe = create_universe(state);
+
         universe.subscribe(Box::new(move |universe| {
             let c = universe.read().unwrap().counter;
             *some_value_clone.borrow_mut() += c;
