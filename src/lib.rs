@@ -71,7 +71,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 /// All clones hold pointers to the same inner state.
 pub struct AppUniverse<U: AppUniverseCore> {
     universe: Arc<RwLock<U>>,
-    subscribers: Arc<RwLock<Vec<Box<dyn Fn(UniverseWrapper<U>)>>>>,
+    subscribers: Arc<RwLock<Vec<Box<dyn FnMut(AppUniverse<U>)>>>>,
 }
 
 /// This alloows you to create an app universe
@@ -91,10 +91,8 @@ pub trait AppUniverseCore: Sized {
 }
 
 /// This wrapper defines the type of a universe
-pub type UniverseWrapper<U> = Arc<RwLock<U>>;
 
 impl<U: AppUniverseCore + 'static> AppUniverse<U> {
-    /// Create a new AppUniverseWrapper.
     fn new(universe_core: U) -> Self {
         let universe = Arc::new(RwLock::new(universe_core));
         Self {
@@ -106,8 +104,8 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     /// Acquire write access to the AppUniverse then send a message.
     pub fn msg(&self, msg: U::Message) {
         self.universe.write().unwrap().msg(msg);
-        for subscriber in self.subscribers.read().unwrap().iter() {
-            (subscriber)(self.universe.clone());
+        for subscriber in self.subscribers.write().unwrap().iter_mut() {
+            (subscriber)(self.clone());
         }
     }
 
@@ -117,7 +115,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     }
 
     /// Subscribe to the Universe
-    pub fn subscribe(&mut self, subscriber_fn: Box<dyn Fn(UniverseWrapper<U>)>) {
+    pub fn subscribe(&mut self, subscriber_fn: Box<dyn FnMut(AppUniverse<U>)>) {
         self.subscribers.write().unwrap().push(subscriber_fn);
     }
 
