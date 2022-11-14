@@ -35,7 +35,7 @@ impl AppUniverseCore for TestAppState {
 
 fn main () {
     let state = TestAppState { counter: 0 };
-    let mut universe = create_universe(state);
+    let mut universe = AppUniverse::new(state);
 
     universe.msg(Msg::Increment(1));
 }
