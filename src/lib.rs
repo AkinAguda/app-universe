@@ -101,5 +101,6 @@
 //! ```
 
 /// This is the app_universe
-pub mod app_universe;
+mod app_universe;
+pub use app_universe::*;
 mod tests;
