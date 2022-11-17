@@ -10,6 +10,12 @@ pub struct AppUniverse<U: AppUniverseCore> {
     subscribers: Arc<RwLock<Vec<Box<dyn FnMut(AppUniverse<U>)>>>>,
 }
 
+/// This is a subscription
+pub struct UniverseSubscription {
+    /// Address
+    pub address: usize,
+}
+
 /// Defines how messages that indicate that something has happened get sent to the universe.
 pub trait AppUniverseCore: Sized {
     /// Indicates that something has happened.
@@ -18,6 +24,10 @@ pub trait AppUniverseCore: Sized {
     /// Send a message to the state object.
     /// This will usually lead to a state update
     fn msg(&mut self, message: Self::Message);
+}
+
+fn type_id_of_val<T>(_: &T) -> usize {
+    type_id_of_val::<T> as usize
 }
 
 /// This wrapper defines the type of a universe
@@ -46,8 +56,28 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     }
 
     /// Subscribe to the Universe
-    pub fn subscribe(&mut self, subscriber_fn: Box<dyn FnMut(AppUniverse<U>)>) {
+    pub fn subscribe(
+        &mut self,
+        subscriber_fn: Box<dyn FnMut(AppUniverse<U>)>,
+    ) -> UniverseSubscription {
+        let address = type_id_of_val(&subscriber_fn);
         self.subscribers.write().unwrap().push(subscriber_fn);
+        UniverseSubscription { address }
+    }
+
+    /// Unsubscribes
+    pub fn unsubscribe(&mut self, subscription: UniverseSubscription) {
+        let mut subscribers = self.subscribers.write().unwrap();
+        let mut index_to_remove: Option<usize> = None;
+        for (index, subscriber) in subscribers.iter().enumerate() {
+            if type_id_of_val(subscriber) == subscription.address {
+                index_to_remove = Some(index);
+                break;
+            }
+        }
+        if let Some(index) = index_to_remove {
+            subscribers.swap_remove(index);
+        }
     }
 
     /// Acquire write access to AppUniverse.
