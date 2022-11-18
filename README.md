@@ -38,6 +38,14 @@ fn main () {
     let mut universe = AppUniverse::new(state);
 
     universe.msg(Msg::Increment(1));
+
+   let subscription = universe.subscribe(|universe| {
+       println!("Counter value is {}", universe.read().counter);
+     });
+
+    universe.msg(Msg::Increment(1));
+
+    universe.unsubscribe(subscription);
 }
 ```
 
