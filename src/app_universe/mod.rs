@@ -2,17 +2,17 @@
 
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-/// Cloning an `AppUniverse` is a very cheap operation.
+/// This is the AppUniverse struct that holds the universe (state) in an Arc<RwLock> and internally, the subscribers.
 ///
-/// All clones hold pointers to the same inner state.
+/// Cloning the AppUniverse is really cheap and all clones hold pointers to the same inner state.
 pub struct AppUniverse<U: AppUniverseCore> {
     universe: Arc<RwLock<U>>,
     subscribers: Arc<RwLock<Vec<Box<dyn FnMut(AppUniverse<U>)>>>>,
 }
 
-/// This is a subscription
+/// This is a subscription struct. Typically, you are NOT supposed to use this struct for anything other than passing it into the universe to during unsubscription
 pub struct UniverseSubscription {
-    /// Address
+    /// This holds the address of the subscription function in memory
     pub address: usize,
 }
 
@@ -31,7 +31,6 @@ fn type_id_of_val<T>(_: &T) -> usize {
 }
 
 /// This wrapper defines the type of a universe
-
 impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     /// This creates a new app_universe
     pub fn new(universe_core: U) -> Self {
@@ -55,7 +54,9 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
         self.universe.read().unwrap()
     }
 
-    /// Subscribe to the Universe
+    /// This function takes a subscriber function that takes and is run anytime state changes.
+    ///
+    /// A subscriber function `subscriber_fn` is a function that will be called whenever state changes and it will pass in the updated state
     pub fn subscribe(
         &mut self,
         subscriber_fn: Box<dyn FnMut(AppUniverse<U>)>,
@@ -65,7 +66,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
         UniverseSubscription { address }
     }
 
-    /// Unsubscribes
+    /// This function takes a subscription and removed the subscriber function so that it is no longer gets called whenever state changes
     pub fn unsubscribe(&mut self, subscription: UniverseSubscription) {
         let mut subscribers = self.subscribers.write().unwrap();
         let mut index_to_remove: Option<usize> = None;

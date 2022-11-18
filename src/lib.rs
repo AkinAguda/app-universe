@@ -35,7 +35,13 @@
 //!     let state = TestAppState { counter: 0 };
 //!     let mut universe = AppUniverse::new(state);
 //!
+//!     let subscription = universe.subscribe(|universe| {
+//!         println!("Counter value is {}", universe.read().counter);
+//!      });
+//!
 //!     universe.msg(Msg::Increment(1));
+//!
+//!     universe.unsubscribe(subscription);
 //! }
 //! ```
 //!
@@ -99,6 +105,33 @@
 //! let mut universe = AppUniverse::new(core);
 //!
 //! ```
+//!
+//! ## Subscribing to the `AppUniverse`
+//! Subscribing to the `AppUniverse` essentially means passing a callback that should be called whenever state changes.
+//! A subscriber function (`subscriber_fn`) will recieve the `AppUniverse` as an argument whenever it's called.
+//!
+//! ```rust
+//! let core = MyAppUniverseCore { user: User {}, cart: vec![] };
+//!
+//! let mut universe = AppUniverse::new(core);
+//!
+//! let subscription = universe.subscribe(|universe| { /* Do something */ });
+//!
+//! ```
+//!
+//! ## Unsubscribing from the `AppUniverse`
+//! Unsubscribing from the `AppUniverse` essentially means you are removing a subscription function from the list of functions that get called whenever state changes
+//!
+//! ```rust
+//! let core = MyAppUniverseCore { user: User {}, cart: vec![] };
+//!
+//! let mut universe = AppUniverse::new(core);
+//!
+//! let subscription = universe.subscribe(|universe| { /* Do something */ });
+//!
+//! universe.unsubscribe(subscription);
+//!
+//!```
 
 /// This is the app_universe
 mod app_universe;
