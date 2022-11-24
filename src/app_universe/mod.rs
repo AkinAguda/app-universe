@@ -13,7 +13,14 @@ struct Subscription<U: AppUniverseCore> {
 pub struct AppUniverse<U: AppUniverseCore> {
     universe: Arc<RwLock<U>>,
     subscribers: Arc<RwLock<Vec<Subscription<U>>>>,
-    subscriber_ids: Arc<RwLock<Vec<u16>>>,
+    /* The first value in this vector keeps a count of the current maxiumum number used as a subscriber id.
+    Whenever an unsubscription occurs, it adds the id to this vector of `available_subscriber_ids`.
+    Whenever all the available subscriber ids have been reassigned to a new subscription, it will assign the first
+    value in `available_subscriber_ids` as the new subscriber id and increment it, ready to be re_used as a `subscriber_id`.
+
+    The major cost here is in space. If we have 10000 subscriptions and 998 unsubscriptions for instance, we will have 998 `available_subscriber_ids` + the counter at index 0
+    */
+    available_subscriber_ids: Arc<RwLock<Vec<u16>>>,
 }
 
 /// This is a subscription struct. Typically, you are NOT supposed to use this struct for anything other than passing it into the universe to during unsubscription
@@ -40,7 +47,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
         Self {
             universe,
             subscribers: Arc::new(RwLock::new(vec![])),
-            subscriber_ids: Arc::new(RwLock::new(vec![0])),
+            available_subscriber_ids: Arc::new(RwLock::new(vec![0])),
         }
     }
 
@@ -65,14 +72,14 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
         subscriber_fn: Box<dyn FnMut(AppUniverse<U>)>,
     ) -> UniverseSubscription {
         let mut subscribers = self.subscribers.write().unwrap();
-        let mut subscription_ids = self.subscriber_ids.write().unwrap();
+        let mut available_subscription_ids = self.available_subscriber_ids.write().unwrap();
 
-        let mut subscription_id = subscription_ids[0];
+        let mut subscription_id = available_subscription_ids[0];
 
-        if subscription_ids.len() > 1 {
-            subscription_id = subscription_ids.pop().unwrap();
+        if available_subscription_ids.len() > 1 {
+            subscription_id = available_subscription_ids.pop().unwrap();
         } else {
-            subscription_ids[0] += 1;
+            available_subscription_ids[0] += 1;
         }
 
         subscribers.push(Subscription {
@@ -86,7 +93,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     /// This function takes a subscription and removed the subscriber function so that it is no longer gets called whenever state changes
     pub fn unsubscribe(&mut self, subscription: UniverseSubscription) {
         let mut subscribers = self.subscribers.write().unwrap();
-        let mut subscriber_ids = self.subscriber_ids.write().unwrap();
+        let mut available_subscriber_ids = self.available_subscriber_ids.write().unwrap();
 
         let mut index_to_remove: Option<usize> = None;
         for (index, subscriber) in subscribers.iter().enumerate() {
@@ -96,7 +103,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
             }
         }
         if let Some(index) = index_to_remove {
-            subscriber_ids.push(subscribers[index].id);
+            available_subscriber_ids.push(subscribers[index].id);
             subscribers.swap_remove(index);
         }
     }
@@ -119,7 +126,7 @@ impl<W: AppUniverseCore> Clone for AppUniverse<W> {
         AppUniverse {
             universe: self.universe.clone(),
             subscribers: self.subscribers.clone(),
-            subscriber_ids: self.subscriber_ids.clone(),
+            available_subscriber_ids: self.available_subscriber_ids.clone(),
         }
     }
 }
