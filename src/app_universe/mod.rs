@@ -2,18 +2,24 @@
 
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
+struct Subscription<U: AppUniverseCore> {
+    subscriber_fn: Box<dyn FnMut(AppUniverse<U>)>,
+    id: u16,
+}
+
 /// This is the AppUniverse struct that holds the universe (state) in an Arc<RwLock> and internally, the subscribers.
 ///
 /// Cloning the AppUniverse is really cheap and all clones hold pointers to the same inner state.
 pub struct AppUniverse<U: AppUniverseCore> {
     universe: Arc<RwLock<U>>,
-    subscribers: Arc<RwLock<Vec<Box<dyn FnMut(AppUniverse<U>)>>>>,
+    subscribers: Arc<RwLock<Vec<Subscription<U>>>>,
+    subscriber_ids: Arc<RwLock<Vec<u16>>>,
 }
 
 /// This is a subscription struct. Typically, you are NOT supposed to use this struct for anything other than passing it into the universe to during unsubscription
 pub struct UniverseSubscription {
-    /// This holds the address of the subscription function in memory
-    pub address: usize,
+    /// This holds the index of the subscription function in the subscriptions array
+    pub subscription_id: u16,
 }
 
 /// Defines how messages that indicate that something has happened get sent to the universe.
@@ -26,10 +32,6 @@ pub trait AppUniverseCore: Sized {
     fn msg(&mut self, message: Self::Message);
 }
 
-fn type_id_of_val<T>(_: &T) -> usize {
-    type_id_of_val::<T> as usize
-}
-
 /// This wrapper defines the type of a universe
 impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     /// This creates a new app_universe
@@ -38,6 +40,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
         Self {
             universe,
             subscribers: Arc::new(RwLock::new(vec![])),
+            subscriber_ids: Arc::new(RwLock::new(vec![0])),
         }
     }
 
@@ -45,7 +48,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     pub fn msg(&self, msg: U::Message) {
         self.universe.write().unwrap().msg(msg);
         for subscriber in self.subscribers.write().unwrap().iter_mut() {
-            (subscriber)(self.clone());
+            (subscriber.subscriber_fn)(self.clone());
         }
     }
 
@@ -61,22 +64,39 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
         &mut self,
         subscriber_fn: Box<dyn FnMut(AppUniverse<U>)>,
     ) -> UniverseSubscription {
-        let address = type_id_of_val(&subscriber_fn);
-        self.subscribers.write().unwrap().push(subscriber_fn);
-        UniverseSubscription { address }
+        let mut subscribers = self.subscribers.write().unwrap();
+        let mut subscription_ids = self.subscriber_ids.write().unwrap();
+
+        let mut subscription_id = subscription_ids[0];
+
+        if subscription_ids.len() > 1 {
+            subscription_id = subscription_ids.pop().unwrap();
+        } else {
+            subscription_ids[0] += 1;
+        }
+
+        subscribers.push(Subscription {
+            subscriber_fn,
+            id: subscription_id,
+        });
+
+        UniverseSubscription { subscription_id }
     }
 
     /// This function takes a subscription and removed the subscriber function so that it is no longer gets called whenever state changes
     pub fn unsubscribe(&mut self, subscription: UniverseSubscription) {
         let mut subscribers = self.subscribers.write().unwrap();
+        let mut subscriber_ids = self.subscriber_ids.write().unwrap();
+
         let mut index_to_remove: Option<usize> = None;
         for (index, subscriber) in subscribers.iter().enumerate() {
-            if type_id_of_val(subscriber) == subscription.address {
+            if subscriber.id == subscription.subscription_id {
                 index_to_remove = Some(index);
                 break;
             }
         }
         if let Some(index) = index_to_remove {
+            subscriber_ids.push(subscribers[index].id);
             subscribers.swap_remove(index);
         }
     }
@@ -99,6 +119,7 @@ impl<W: AppUniverseCore> Clone for AppUniverse<W> {
         AppUniverse {
             universe: self.universe.clone(),
             subscribers: self.subscribers.clone(),
+            subscriber_ids: self.subscriber_ids.clone(),
         }
     }
 }
