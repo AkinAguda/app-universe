@@ -104,13 +104,13 @@ mod tests {
         universe.msg(Msg::Increment(1));
 
         // This should unsubscribe the some_other_value increment function
-        universe.unsubscribe(sub2);
+        universe.unsubscribe(sub2).unwrap();
 
         // This should make some_value increase by the new value of counter which is 2 => 103
         universe.msg(Msg::Increment(1));
 
         // This should unsubscribe the some_value increment function
-        universe.unsubscribe(sub1);
+        universe.unsubscribe(sub1).unwrap();
 
         // This should only cause an increment in state
         universe.msg(Msg::Increment(1));

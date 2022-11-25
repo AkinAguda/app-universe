@@ -26,7 +26,7 @@ pub struct AppUniverse<U: AppUniverseCore> {
 /// This is a subscription struct. Typically, you are NOT supposed to use this struct for anything other than passing it into the universe to during unsubscription
 pub struct UniverseSubscription {
     /// This holds the index of the subscription function in the subscriptions array
-    pub subscription_id: u16,
+    subscription_id: u16,
 }
 
 /// Defines how messages that indicate that something has happened get sent to the universe.
@@ -91,7 +91,7 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     }
 
     /// This function takes a subscription and removed the subscriber function so that it is no longer gets called whenever state changes
-    pub fn unsubscribe(&mut self, subscription: UniverseSubscription) {
+    pub fn unsubscribe(&mut self, subscription: UniverseSubscription) -> Result<(), &str> {
         let mut subscribers = self.subscribers.write().unwrap();
         let mut available_subscriber_ids = self.available_subscriber_ids.write().unwrap();
 
@@ -105,6 +105,9 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
         if let Some(index) = index_to_remove {
             available_subscriber_ids.push(subscribers[index].id);
             subscribers.swap_remove(index);
+            Ok(())
+        } else {
+            Err("Subscription not found")
         }
     }
 
