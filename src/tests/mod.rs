@@ -70,7 +70,7 @@ mod tests {
 
         universe.msg(Msg::Increment(1));
 
-        universe.unsubscribe(subscription);
+        universe.unsubscribe(subscription).unwrap();
 
         universe.msg(Msg::Increment(1));
 

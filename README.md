@@ -45,7 +45,7 @@ fn main () {
 
     universe.msg(Msg::Increment(1));
 
-    universe.unsubscribe(subscription);
+    universe.unsubscribe(subscription).unwrap();
 }
 ```
 

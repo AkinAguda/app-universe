@@ -41,7 +41,7 @@
 //!
 //!     universe.msg(Msg::Increment(1));
 //!
-//!     universe.unsubscribe(subscription);
+//!     universe.unsubscribe(subscription).unwrap();
 //! }
 //! ```
 //!
@@ -129,7 +129,7 @@
 //!
 //! let subscription = universe.subscribe(|universe| { /* Do something */ });
 //!
-//! universe.unsubscribe(subscription);
+//! universe.unsubscribe(subscription).unwrap();
 //!
 //!```
 
