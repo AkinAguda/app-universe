@@ -16,9 +16,9 @@ type UniverseSubscriptionParameter<U> = Rc<RefCell<Subscription<U>>>;
 /// `AppUniverse` whenever it's called.
 pub struct UniverseSubscription<U: AppUniverseCore>(UniverseSubscriptionParameter<U>);
 
-/// This is the holds the application state "universe" and the subscriptions to
+/// This is the holds the application state (universe) and the subscriptions to
 /// that state. The only way to read information about the state publicly is by calling
-/// the `read` method on `AppUniverse`. There is no way to publicly access the subscriptions
+/// the `read` method on `AppUniverse`. There is no way to publicly access the subscriptions.
 ///
 /// Cloning the AppUniverse is really cheap and all clones hold pointers to the same inner state.
 pub struct AppUniverse<U: AppUniverseCore> {

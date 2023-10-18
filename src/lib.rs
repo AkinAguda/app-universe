@@ -72,7 +72,7 @@
 //!
 //! ## The `Message` type
 //! The Message type alias refers to an enum were each variant will be matched against in the `msg` function.
-//! This Message acts like a `action` in `redux`
+//! This Message acts like a `action` in `redux`.
 //!
 //! ## The `msg` function
 //! The `msg` function is the **ONLY** way to mutate state. The `msg` function matches against every variant in the `Message` enum. In each match branch you are expected to mutate state in some way. This is the **ONLY** plave you can mutate state.
@@ -131,7 +131,11 @@
 //!
 //! universe.unsubscribe(subscription).unwrap();
 //!
-//!```
+//! ```
+//!
+//! ## Things to Note:
+//! At the moment, app-universe has no support for multithreading.
+//!
 
 /// This is the app_universe
 mod app_universe;
