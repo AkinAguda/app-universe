@@ -1,41 +1,41 @@
 #![deny(missing_docs)]
 
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::{
+    cell::{Ref, RefCell},
+    rc::Rc,
+};
 
-struct Subscription<U: AppUniverseCore> {
-    subscriber_fn: Box<dyn FnMut(AppUniverse<U>)>,
-    id: u16,
-}
+/// This is the internal subscription used to hold the subscriber function.
+struct Subscription<U: AppUniverseCore>(Box<dyn FnMut(AppUniverse<U>)>);
 
-/// This is the AppUniverse struct that holds the universe (state) in an Arc<RwLock> and internally, the subscribers.
+type UniverseSubscriptionParameter<U> = Rc<RefCell<Subscription<U>>>;
+
+/// The `UniverseSubscription` is the public subscription that is returned
+/// whenever the `subscribe` method on `AppUniverse` is called.
+/// Its only purpose is to be passed into the `unsubscribe` method on
+/// `AppUniverse` whenever it's called.
+pub struct UniverseSubscription<U: AppUniverseCore>(UniverseSubscriptionParameter<U>);
+
+/// This is the holds the application state "universe" and the subscriptions to
+/// that state. The only way to read information about the state publicly is by calling
+/// the `read` method on `AppUniverse`. There is no way to publicly access the subscriptions
 ///
 /// Cloning the AppUniverse is really cheap and all clones hold pointers to the same inner state.
 pub struct AppUniverse<U: AppUniverseCore> {
-    universe: Arc<RwLock<U>>,
-    subscribers: Arc<RwLock<Vec<Subscription<U>>>>,
-    /* The first value in this vector keeps a count of the current maxiumum number used as a subscriber id.
-    Whenever an unsubscription occurs, it adds the id to this vector of `available_subscriber_ids`.
-    Whenever all the available subscriber ids have been reassigned to a new subscription, it will assign the first
-    value in `available_subscriber_ids` as the new subscriber id and increment it, ready to be re_used as a `subscriber_id`.
-
-    The major cost here is in space. If we have 10000 subscriptions and 998 unsubscriptions for instance, we will have 998 `available_subscriber_ids` + the counter at index 0
-    */
-    available_subscriber_ids: Arc<RwLock<Vec<u16>>>,
+    universe: Rc<RefCell<U>>,
+    subscriptions: Rc<RefCell<Vec<UniverseSubscriptionParameter<U>>>>,
 }
 
-/// This is a subscription struct. Typically, you are NOT supposed to use this struct for anything other than passing it into the universe to during unsubscription
-pub struct UniverseSubscription {
-    /// This holds the index of the subscription function in the subscriptions array
-    subscription_id: u16,
-}
-
-/// Defines how messages that indicate that something has happened get sent to the universe.
+/// This trait defines the blueprint for the "core" of a universe.
+/// This means that for you to create an instance of `AppUniverse`,
+/// the value you pass in as your state "core" has to implement `AppUniverseCore`.
 pub trait AppUniverseCore: Sized {
-    /// Indicates that something has happened.
+    /// The `Message` typically is an enum with multiple variants that define an
+    /// action that could occur.
     type Message;
 
-    /// Send a message to the state object.
-    /// This will usually lead to a state update
+    /// The `msg` method should typically mutate state in some way. It should
+    /// react to the variant of `Message` sent in as mutate the state.
     fn msg(&mut self, message: Self::Message);
 }
 
@@ -43,84 +43,57 @@ pub trait AppUniverseCore: Sized {
 impl<U: AppUniverseCore + 'static> AppUniverse<U> {
     /// This creates a new app_universe
     pub fn new(universe_core: U) -> Self {
-        let universe = Arc::new(RwLock::new(universe_core));
+        let universe = Rc::new(RefCell::new(universe_core));
         Self {
             universe,
-            subscribers: Arc::new(RwLock::new(vec![])),
-            available_subscriber_ids: Arc::new(RwLock::new(vec![0])),
+            subscriptions: Rc::new(RefCell::new(vec![])),
         }
     }
 
-    /// Acquire write access to the AppUniverse then send a message.
+    /// This method allows for mutation of state by sending a message
     pub fn msg(&self, msg: U::Message) {
-        self.universe.write().unwrap().msg(msg);
-        for subscriber in self.subscribers.write().unwrap().iter_mut() {
-            (subscriber.subscriber_fn)(self.clone());
+        self.universe.borrow_mut().msg(msg);
+        for subscriber in self.subscriptions.borrow_mut().iter() {
+            (subscriber.borrow_mut().0)(self.clone());
         }
     }
 
-    /// Acquire read access to AppUniverse.
-    pub fn read(&self) -> RwLockReadGuard<'_, U> {
-        self.universe.read().unwrap()
+    /// Acquire read access to the state.
+    pub fn read(&self) -> Ref<'_, U> {
+        self.universe.borrow()
     }
 
-    /// This function takes a subscriber function that takes and is run anytime state changes.
+    /// This function takes a subscriber function that runs anytime the state changes.
     ///
     /// A subscriber function `subscriber_fn` is a function that will be called whenever state changes and it will pass in the updated state
     pub fn subscribe(
         &mut self,
         subscriber_fn: Box<dyn FnMut(AppUniverse<U>)>,
-    ) -> UniverseSubscription {
-        let mut subscribers = self.subscribers.write().unwrap();
-        let mut available_subscription_ids = self.available_subscriber_ids.write().unwrap();
+    ) -> UniverseSubscription<U> {
+        let subscription = Rc::new(RefCell::new(Subscription(subscriber_fn)));
 
-        let mut subscription_id = available_subscription_ids[0];
+        let universe_subscription = UniverseSubscription(subscription.clone());
 
-        if available_subscription_ids.len() > 1 {
-            subscription_id = available_subscription_ids.pop().unwrap();
-        } else {
-            available_subscription_ids[0] += 1;
-        }
+        self.subscriptions.borrow_mut().push(subscription.clone());
 
-        subscribers.push(Subscription {
-            subscriber_fn,
-            id: subscription_id,
-        });
-
-        UniverseSubscription { subscription_id }
+        universe_subscription
     }
 
-    /// This function takes a subscription and removed the subscriber function so that it is no longer gets called whenever state changes
-    pub fn unsubscribe(&mut self, subscription: UniverseSubscription) -> Result<(), &str> {
-        let mut subscribers = self.subscribers.write().unwrap();
-        let mut available_subscriber_ids = self.available_subscriber_ids.write().unwrap();
+    /// This function takes a subscription and removes the subscriber function so that it is no longer gets called whenever state changes
+    pub fn unsubscribe(&mut self, subscription: UniverseSubscription<U>) -> Result<(), &str> {
+        let sub_len_before = self.subscriptions.borrow().len();
 
-        let mut index_to_remove: Option<usize> = None;
-        for (index, subscriber) in subscribers.iter().enumerate() {
-            if subscriber.id == subscription.subscription_id {
-                index_to_remove = Some(index);
-                break;
-            }
-        }
-        if let Some(index) = index_to_remove {
-            available_subscriber_ids.push(subscribers[index].id);
-            subscribers.swap_remove(index);
-            Ok(())
+        self.subscriptions
+            .borrow_mut()
+            .retain(|sub| !Rc::ptr_eq(sub, &subscription.0));
+
+        let sub_len_after = self.subscriptions.borrow().len();
+
+        if sub_len_before != sub_len_after {
+            return Ok(());
         } else {
-            Err("Subscription not found")
+            return Err("Subscription not found");
         }
-    }
-
-    /// Acquire write access to AppUniverse.
-    ///
-    /// Under normal circumstances you should only ever write to the universe through the `.msg()`
-    /// method.
-    ///
-    /// This .write() method is useful when writing tests where you want to quickly set up some
-    /// initial state.
-    #[cfg(feature = "test-utils")]
-    pub fn write(&self) -> std::sync::RwLockWriteGuard<'_, W> {
-        self.universe.write().unwrap()
     }
 }
 
@@ -128,8 +101,7 @@ impl<W: AppUniverseCore> Clone for AppUniverse<W> {
     fn clone(&self) -> Self {
         AppUniverse {
             universe: self.universe.clone(),
-            subscribers: self.subscribers.clone(),
-            available_subscriber_ids: self.available_subscriber_ids.clone(),
+            subscriptions: self.subscriptions.clone(),
         }
     }
 }

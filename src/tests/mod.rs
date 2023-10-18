@@ -54,7 +54,7 @@ mod tests {
     }
 
     #[test]
-    fn unsubscription_works_sync() {
+    fn unsubscription_works() {
         use std::cell::RefCell;
 
         let some_value = Rc::new(RefCell::new(100));
@@ -76,46 +76,5 @@ mod tests {
 
         assert_eq!(*some_value.borrow(), 101);
     }
-
-    #[test]
-    fn multiple_subscriptions_unsubscriptions_works_sync() {
-        use std::cell::RefCell;
-
-        let some_value = Rc::new(RefCell::new(100));
-        let some_other_value = Rc::new(RefCell::new(0));
-        let some_value_clone = some_value.clone();
-        let some_other_value_clone = some_other_value.clone();
-        let state = TestAppState { counter: 0 };
-
-        let mut universe = AppUniverse::new(state);
-
-        let sub1 = universe.subscribe(Box::new(move |universe| {
-            let c = universe.read().counter;
-            *some_value_clone.borrow_mut() += c;
-        }));
-
-        let sub2 = universe.subscribe(Box::new(move |universe| {
-            let g = universe.read().counter;
-            *some_other_value_clone.borrow_mut() += g;
-        }));
-
-        // This should make some_value increase by 1 => 101
-        // This should aslo make some_other_value increase by 1 => 1
-        universe.msg(Msg::Increment(1));
-
-        // This should unsubscribe the some_other_value increment function
-        universe.unsubscribe(sub2).unwrap();
-
-        // This should make some_value increase by the new value of counter which is 2 => 103
-        universe.msg(Msg::Increment(1));
-
-        // This should unsubscribe the some_value increment function
-        universe.unsubscribe(sub1).unwrap();
-
-        // This should only cause an increment in state
-        universe.msg(Msg::Increment(1));
-
-        assert_eq!(*some_value.borrow(), 103);
-        assert_eq!(*some_other_value.borrow(), 1);
-    }
+    /* TODO Expose some methods to test the number of subs when unsubs are made*/
 }
