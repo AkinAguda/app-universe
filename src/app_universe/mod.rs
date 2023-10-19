@@ -5,8 +5,13 @@ use std::{
     rc::Rc,
 };
 
+#[cfg(not(feature = "test-utils"))]
 /// This is the internal subscription used to hold the subscriber function.
 struct Subscription<U: AppUniverseCore>(Box<dyn FnMut(AppUniverse<U>)>);
+
+#[cfg(feature = "test-utils")]
+/// This is a version of the subscription above that is public for testing purposes
+pub struct Subscription<U: AppUniverseCore>(Box<dyn FnMut(AppUniverse<U>)>);
 
 type UniverseSubscriptionParameter<U> = Rc<RefCell<Subscription<U>>>;
 
@@ -94,6 +99,12 @@ impl<U: AppUniverseCore + 'static> AppUniverse<U> {
         } else {
             return Err("Subscription not found");
         }
+    }
+
+    #[cfg(feature = "test-utils")]
+    /// This function is used in tests to read subscriptions
+    pub fn read_subscriptions(&self) -> Ref<'_, Vec<UniverseSubscriptionParameter<U>>> {
+        self.subscriptions.borrow()
     }
 }
 
