@@ -78,6 +78,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "test-utils")]
     fn unsubscription_removes_correct_subscription() {
         use std::cell::RefCell;
 

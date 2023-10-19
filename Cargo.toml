@@ -9,7 +9,6 @@ repository = "https://github.com/AkinAguda/app-universe"
 documentation = "https://docs.rs/app_universe"
 
 [features]
-default = ["test-utils"]
 test-utils = []
 
 [dependencies]
