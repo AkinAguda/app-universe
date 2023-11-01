@@ -1,4 +1,5 @@
 //! `app-universe` provides a framework agnostic approach to managing frontend application state.
+//! It essentially funtions like [redux](https://github.com/reduxjs/redux) from the javascript ecosystem.
 //!
 //! # Example Usage
 //!
@@ -139,5 +140,5 @@
 
 /// This is the app_universe
 mod app_universe;
-pub use app_universe::*;
+pub use crate::app_universe::*;
 mod tests;
