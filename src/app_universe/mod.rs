@@ -6,7 +6,7 @@ use std::{
 };
 
 #[cfg(not(feature = "test-utils"))]
-/// This is the internal subscription used to hold the subscriber function.
+// This is the internal subscription used to hold the subscriber function.
 struct Subscription<U: AppUniverseCore>(Box<dyn FnMut(AppUniverse<U>)>);
 
 #[cfg(feature = "test-utils")]

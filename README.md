@@ -5,14 +5,11 @@ A framework agnostic approach to managing frontend application state based on [a
 # Example Usage
 
 ```rust
-use app_universe::AppUniverseCore;
+mod app_universe;
+use app_universe::{ AppUniverse, AppUniverseCore };
 
 struct TestAppState {
     counter: u8,
-}
-
-struct MyAppState {
-    count: u32
 }
 
 pub enum Msg {
@@ -31,17 +28,15 @@ impl AppUniverseCore for TestAppState {
     }
 }
 
-
-
 fn main () {
     let state = TestAppState { counter: 0 };
     let mut universe = AppUniverse::new(state);
 
     universe.msg(Msg::Increment(1));
 
-   let subscription = universe.subscribe(|universe| {
-       println!("Counter value is {}", universe.read().counter);
-     });
+    let subscription = universe.subscribe(Box::new(move |universe| {
+        println!("Counter value is {}", universe.read().counter);
+    }));
 
     universe.msg(Msg::Increment(1));
 
