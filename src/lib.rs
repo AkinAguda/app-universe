@@ -4,14 +4,10 @@
 //! # Example Usage
 //!
 //! ```rust
-//! use app_universe::AppUniverseCore;
+//! use app_universe::{ AppUniverse, AppUniverseCore };
 //!
 //! struct TestAppState {
 //!     counter: u8,
-//! }
-//!
-//! struct MyAppState {
-//!     count: u32
 //! }
 //!
 //! pub enum Msg {
@@ -30,15 +26,15 @@
 //!     }
 //! }
 //!
-//!
-//!
-//! fn main () {
+//! fn main() {
 //!     let state = TestAppState { counter: 0 };
 //!     let mut universe = AppUniverse::new(state);
 //!
-//!     let subscription = universe.subscribe(|universe| {
+//!     universe.msg(Msg::Increment(1));
+//!
+//!     let subscription = universe.subscribe(Box::new(move |universe| {
 //!         println!("Counter value is {}", universe.read().counter);
-//!      });
+//!     }));
 //!
 //!     universe.msg(Msg::Increment(1));
 //!
@@ -47,25 +43,40 @@
 //! ```
 //!
 //! # The API
-//! The core API is mostly defined by the `AppUniverseCore` trait and the The `AppUniverse` struct.
+//! The core API is mostly defined by the `AppUniverseCore` trait and the `AppUniverse` struct.
 //!
 //! ## The `AppUniverseCore` trait
 //!
 //! The `AppUniverseCore` trait is intended to be implemented for the struct that holds your application state.
 //!
-//! Here's an example of what some state for a basic e-commerce app that implements `AppUniverseCore` might look like:
+//! Let's implement `AppUniverseCore` for our application state. First we define our state:
 //!
 //! ```rust
-//! struct MyAppUniverseCore {
-//!     user: User,
+//! use app_universe::{ AppUniverse, AppUniverseCore };
+//!
+//! struct Product {
+//!    id: u16
+//! }
+//! struct MyAppState {
 //!     cart: Vec<Product>
 //! }
 //!
-//! impl AppUniverseCore for MyAppUniverseCore {
+//! # enum Msg {
+//! #   AddProductToCart(Product),
+//! # }
+//! #
+//! impl AppUniverseCore for MyAppState {
+//!    # type Message = Msg;
+//!    # fn msg(&mut self, message: Self::Message) {
+//!    #   todo!();
+//!    # }
 //!     // We Will fill this in soon
 //! }
-//! ```
 //!
+//! fn main() {
+//!     // We will populate this soon
+//! }
+//! ```
 //! Whenever a struct implements `AppUniverseCore`, it expects you to define 2 things:
 //!
 //! - A `Message` type
@@ -81,11 +92,20 @@
 //! Now let's continue with our implementation
 //!
 //! ```rust
-//! pub enum Msg {
-//!     AddProductToCart(Product),
+//! # use app_universe::{ AppUniverse, AppUniverseCore };
+//! #
+//! # struct Product {
+//! #  id: u16
+//! # }
+//! # struct MyAppState {
+//! #   cart: Vec<Product>
+//! # }
+//! // ...
+//! enum Msg {
+//!   AddProductToCart(Product),
 //! }
 //!
-//! impl AppUniverseCore for MyAppUniverseCore {
+//! impl AppUniverseCore for MyAppState {
 //!     type Message = Msg;
 //!
 //!     fn msg(&mut self, message: Self::Message) {
@@ -96,49 +116,84 @@
 //!         }
 //!     }
 //! }
+//! fn main() {
+//!     // We will populate this soon
+//! }
 //! ```
 //! ## The `AppUniverse`
 //! The `AppUniverse` struct is what you will interract with most of the time.
+//! In our main function, we want to create a new app universe.
 //!
 //! ```rust
-//! let core = MyAppUniverseCore { user: User {}, cart: vec![] };
+//! # use app_universe::{ AppUniverse, AppUniverseCore };
+//! #
+//! # struct Product {
+//! #  id: u16
+//! # }
+//! # struct MyAppState {
+//! #   cart: Vec<Product>
+//! # }
 //!
-//! let mut universe = AppUniverse::new(core);
-//!
+//! # enum Msg {
+//! # AddProductToCart(Product),
+//! # }
+//! #
+//! # impl AppUniverseCore for MyAppState {
+//! #   type Message = Msg;
+//! #
+//! #   fn msg(&mut self, message: Self::Message) {
+//! #       match message {
+//! #           Msg::AddProductToCart(product) => {
+//! #               self.cart.push(product);
+//! #           }
+//! #       }
+//! #   }
+//! # }
+//! // ...
+//! fn main() {
+//!     let core = MyAppState { cart: vec![] };
+//!     let mut universe = AppUniverse::new(core);
+//! }
 //! ```
-//!
 //! ## Subscribing to the `AppUniverse`
 //! Subscribing to the `AppUniverse` essentially means passing a callback that should be called whenever state changes.
-//! A subscriber function (`subscriber_fn`) will recieve the `AppUniverse` as an argument whenever it's called.
+//! A subscriber function will recieve the `AppUniverse` as an argument whenever it's called. Let's subscribe to out universe in our example.
 //!
 //! ```rust
-//! let core = MyAppUniverseCore { user: User {}, cart: vec![] };
-//!
-//! let mut universe = AppUniverse::new(core);
-//!
-//! let subscription = universe.subscribe(|universe| { /* Do something */ });
-//!
+//! # use app_universe::{ AppUniverse, AppUniverseCore };
+//! #
+//! # struct Product {
+//! #  id: u16
+//! # }
+//! #
+//! # struct MyAppState {
+//! #   cart: Vec<Product>
+//! # }
+//! #
+//! # enum Msg {
+//! # AddProductToCart(Product),
+//! # }
+//! # impl AppUniverseCore for MyAppState {
+//! #   type Message = Msg;
+//! #
+//! #   fn msg(&mut self, message: Self::Message) {
+//! #       match message {
+//! #           Msg::AddProductToCart(product) => {
+//! #               self.cart.push(product);
+//! #           }
+//! #       }
+//! #   }
+//! # }
+//! fn main() {
+//!     let core = MyAppState { cart: vec![] };
+//!     let mut universe = AppUniverse::new(core);
+//!     
+//!     let subscription = universe.subscribe(Box::new(|universe| { /* Do something */ }));
+//! }
 //! ```
-//!
-//! ## Unsubscribing from the `AppUniverse`
-//! Unsubscribing from the `AppUniverse` essentially means you are removing a subscription function from the list of functions that get called whenever state changes
-//!
-//! ```rust
-//! let core = MyAppUniverseCore { user: User {}, cart: vec![] };
-//!
-//! let mut universe = AppUniverse::new(core);
-//!
-//! let subscription = universe.subscribe(|universe| { /* Do something */ });
-//!
-//! universe.unsubscribe(subscription).unwrap();
-//!
-//! ```
-//!
-//! ## Things to Note:
-//! At the moment, app-universe has no support for multithreading.
-//!
 
-/// This is the app_universe
 mod app_universe;
-pub use crate::app_universe::*;
 mod tests;
+pub use crate::app_universe::*;
+
+// I want the subscription to be removed when the subscriptions go out of scope
